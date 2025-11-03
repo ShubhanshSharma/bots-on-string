@@ -13,7 +13,7 @@ from app.api.api_v1.routes import router
 
 load_dotenv()
 
-app = FastAPI(title="Multi-Company Chatbot Backend")
+app = FastAPI(title="T.R.I.B.E - TENANT RESOURCE INTELLIGENCE BOT ENSEMBLE")
 
 # Create DB tables (simple approach: create_all). For production use alembic.
 Base.metadata.create_all(bind=engine)

@@ -1,4 +1,4 @@
-# 🤖 BOTS-ON-STRING — FastAPI Backend
+# 🤖 T.R.I.B.E. — FastAPI Backend
 
 A multi-company chatbot training platform where each company can train and deploy its own chatbot using GPT + LangChain + Qdrant.
 
