@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import routes
+from app.api.routes import router
 from app.db.session import engine
 from app.models import Base
 
@@ -23,7 +23,7 @@ app.add_middleware(
 )
 
 # Include all API routes
-app.include_router(routes, prefix="/api")
+app.include_router(router, prefix="/api")
 
 @app.get("/")
 def read_root():
