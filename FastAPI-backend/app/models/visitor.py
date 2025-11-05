@@ -11,7 +11,7 @@ class Visitor(Base):
     name = Column(String, nullable=False)
     email = Column(String, unique=True, index=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    expires_at = Column(DateTime, default=lambda: datetime.now(timezone.utc) + timedelta(days=7))  # 👈 add this
+    expires_at = Column(DateTime, default=lambda: datetime.now(timezone.utc) + datetime.timedelta(days=7))  # 👈 add this
     # Relationships
     sessions = relationship("VisitorSession", back_populates="visitor")
     # ✅ Remove direct import and use string name for lazy loading
