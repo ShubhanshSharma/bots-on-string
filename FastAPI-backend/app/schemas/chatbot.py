@@ -6,7 +6,9 @@ class ChatbotBase(BaseModel):
     name: str
     description: Optional[str] = None
 
-class ChatbotCreate(ChatbotBase):
+class ChatbotCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
     company_id: int
 
 class ChatbotUpdate(BaseModel):
@@ -20,3 +22,11 @@ class ChatbotOut(ChatbotBase):
 
     class Config:
         orm_mode = True
+
+class ChatbotRead(BaseModel):
+    id: int
+    name: str
+    description: Optional[str] = None
+    company_id: int
+
+    model_config = {"from_attributes": True}

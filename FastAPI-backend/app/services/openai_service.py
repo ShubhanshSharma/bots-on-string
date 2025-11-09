@@ -1,5 +1,9 @@
 from langchain_openai import ChatOpenAI
 from app.core.config import get_settings
+import os
+from openai import OpenAI
+
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 settings = get_settings()
 
@@ -17,3 +21,16 @@ async def generate_response(prompt: str, context: str = "") -> str:
     full_prompt = f"Context:\n{context}\n\nUser: {prompt}\nAI:"
     response = await llm.ainvoke(full_prompt)
     return response.content
+
+def generate_reply(user_input: str, context_docs: list[str]) -> str:
+    context_text = "\n".join(context_docs or [])
+    prompt = f"Context:\n{context_text}\n\nUser: {user_input}\nAssistant:"
+    
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[
+            {"role": "system", "content": "You are a helpful chatbot."},
+            {"role": "user", "content": prompt}
+        ]
+    )
+    return response.choices[0].message.content.strip()

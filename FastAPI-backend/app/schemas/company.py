@@ -6,8 +6,9 @@ class CompanyBase(BaseModel):
     name: str
     description: Optional[str] = None
 
-class CompanyCreate(CompanyBase):
-    pass
+class CompanyCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
 
 class CompanyUpdate(BaseModel):
     name: Optional[str] = None
@@ -19,3 +20,10 @@ class CompanyOut(CompanyBase):
 
     class Config:
         orm_mode = True
+
+class CompanyRead(BaseModel):
+    id: int
+    name: str
+    description: str | None = None
+
+    model_config = {"from_attributes": True} 

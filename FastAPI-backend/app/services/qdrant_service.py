@@ -1,12 +1,15 @@
 from qdrant_client import QdrantClient
 from qdrant_client.models import PointStruct, VectorParams, Distance
 from app.core.config import get_settings
+from qdrant_client import QdrantClient
+from sentence_transformers import SentenceTransformer
 
 settings = get_settings()
 
 # Initialize Qdrant client
-qdrant = QdrantClient(url=settings.QDRANT_URL)
-
+# qdrant = QdrantClient(url=settings.QDRANT_URL)
+qdrant = QdrantClient("http://localhost:6333")
+model = SentenceTransformer("all-MiniLM-L6-v2")
 COLLECTION_NAME = "company_documents"
 
 def init_collection():
@@ -49,3 +52,20 @@ def search_similar(company_id: str, query_vector: list[float], limit: int = 3):
         limit=limit,
     )
     return [r.payload["text"] for r in results]
+
+def search_similar_vectors(query: str):
+    vector = model.encode(query).tolist()
+    hits = qdrant.search(
+        collection_name="chatbot_docs",
+        query_vector=vector,
+        limit=3
+    )
+    return [hit.payload.get("text") for hit in hits]
+
+# app/services/qdrant_service.py
+from qdrant_client import QdrantClient
+
+def get_qdrant_client():
+    # read host/port from settings in app.core.config
+    from app.core.config import settings
+    return QdrantClient(url=settings.QDRANT_URL)

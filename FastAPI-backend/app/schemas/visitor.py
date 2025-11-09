@@ -1,12 +1,12 @@
 from pydantic import BaseModel
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 class VisitorBase(BaseModel):
     session_id: str
 
 class VisitorCreate(BaseModel):
-    chatbot_id: int
+    anonymous_id: Optional[str] = None
 
 class VisitorOut(VisitorBase):
     id: int
@@ -15,3 +15,10 @@ class VisitorOut(VisitorBase):
 
     class Config:
         orm_mode = True
+
+class VisitorRead(BaseModel):
+    id: int
+    anonymous_id: Optional[str]
+    created_at: Optional[str] = None
+
+    model_config = {"from_attributes": True}

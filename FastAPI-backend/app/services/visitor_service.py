@@ -6,7 +6,7 @@ import asyncio
 
 from sqlalchemy.orm import Session
 from app.models.visitor import Visitor
-from app.models.chat import ChatMessage
+from app.models.chat import Chat
 from app.core.config import get_settings
 from app.utils.openai_client import generate_response
 from app.utils.qdrant_client import get_qdrant
@@ -14,7 +14,7 @@ from app.utils.qdrant_client import get_qdrant
 def create_visitor_session(db: Session, chatbot_id: int):
     session_id = str(uuid.uuid4())
     now = datetime.utcnow()
-    expires_at = now + timedelta(seconds=get_settings.SESSION_TTL_SECONDS)
+    expires_at = now + timedelta(seconds=get_settings().SESSION_TTL_SECONDS)
     vs = Visitor(session_id=session_id, chatbot_id=chatbot_id, created_at=now, expires_at=expires_at)
     db.add(vs)
     db.commit()
@@ -25,7 +25,7 @@ def get_session_by_id(db: Session, session_id: str):
     return db.query(Visitor).filter(Visitor.session_id == session_id).first()
 
 def append_message(db: Session, visitor: Visitor, role: str, content: str):
-    cm = ChatMessage(visitor_id=visitor.id, role=role, content=content)
+    cm = Chat(visitor_id=visitor.id, role=role, content=content)
     db.add(cm)
     db.commit()
     db.refresh(cm)
@@ -34,7 +34,7 @@ def append_message(db: Session, visitor: Visitor, role: str, content: str):
 async def handle_user_message(db: Session, visitor: Visitor, user_text: str):
     # Build chat history as a list of messages for OpenAI.
     msgs = []
-    chats = db.query(ChatMessage).filter(ChatMessage.visitor_id == visitor.id).order_by(ChatMessage.created_at).all()
+    chats = db.query(Chat).filter(Chat.visitor_id == visitor.id).order_by(Chat.created_at).all()
     for c in chats:
         msgs.append({"role": c.role, "content": c.content})
 
@@ -47,7 +47,7 @@ async def handle_user_message(db: Session, visitor: Visitor, user_text: str):
     append_message(db, visitor, "bot", bot_text)
     return bot_text
 
-# Background cleanup: deletes sessions and chatmessages older than expiry.
+# Background cleanup: deletes sessions and Chats older than expiry.
 async def cleanup_expired_sessions_task(interval_seconds: int = 300):
     """
     Runs forever until cancelled; every `interval_seconds` it deletes expired sessions.
@@ -61,7 +61,7 @@ async def cleanup_expired_sessions_task(interval_seconds: int = 300):
             expired = db.query(Visitor).filter(Visitor.expires_at <= now).all()
             expired_ids = [s.id for s in expired]
             if expired_ids:
-                db.query(ChatMessage).filter(ChatMessage.visitor_id.in_(expired_ids)).delete(synchronize_session=False)
+                db.query(Chat).filter(Chat.visitor_id.in_(expired_ids)).delete(synchronize_session=False)
                 db.query(Visitor).filter(Visitor.id.in_(expired_ids)).delete(synchronize_session=False)
                 db.commit()
             db.close()

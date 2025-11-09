@@ -1,31 +1,32 @@
+# app/models/chat.py
+from __future__ import annotations
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
-from sqlalchemy.orm import relationship
-from app.core.database import Base
+from typing import Optional, TYPE_CHECKING
 
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text
+from sqlalchemy.orm import relationship
+
+# import your project's Base
+from app.db.base import Base
+
+# Use TYPE_CHECKING to avoid runtime circular imports when referencing types
+if TYPE_CHECKING:
+    from app.models.visitor_session import VisitorSession  # for type hints only
+    from app.models.chatbot import Chatbot
 
 class Chat(Base):
     __tablename__ = "chats"
 
     id = Column(Integer, primary_key=True, index=True)
-    visitor_id = Column(Integer, ForeignKey("visitors.id", ondelete="CASCADE"))
-    chatbot_id = Column(Integer, ForeignKey("chatbots.id", ondelete="CASCADE"))
+    visitor_session_id = Column(Integer, ForeignKey("visitor_sessions.id"), nullable=True)
+    chatbot_id = Column(Integer, ForeignKey("chatbots.id"), nullable=True)
+
+    # role can be 'user'|'bot' etc.
+    role = Column(String(20), nullable=False, default="user")
+    message = Column(Text, nullable=False)
+
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    # Relationships
-    visitor = relationship("Visitor", back_populates="chats")
-    chatbot = relationship("Chatbot", back_populates="chats")
-    messages = relationship("ChatMessage", back_populates="chat", cascade="all, delete")
-
-
-class ChatMessage(Base):
-    __tablename__ = "chat_messages"
-
-    id = Column(Integer, primary_key=True, index=True)
-    chat_id = Column(Integer, ForeignKey("chats.id", ondelete="CASCADE"))
-    sender = Column(String, nullable=False)  # "user" or "bot"
-    message = Column(Text, nullable=False)
-    timestamp = Column(DateTime, default=datetime.utcnow)
-
-    # Relationships
-    chat = relationship("Chat", back_populates="messages")
+    # relationships (string form to avoid import-time circular issues)
+    visitor_session = relationship("VisitorSession", back_populates="chats", foreign_keys=[visitor_session_id], lazy="joined")
+    chatbot = relationship("Chatbot", back_populates="chats", foreign_keys=[chatbot_id], lazy="joined")
