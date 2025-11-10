@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import apiClient from "@/lib/apiClient";
-import axios from "axios";
+import fetchClient from "@/lib/apiClient";
 import MessageBubble from "@/components/MessageBubble";
 import Loader from "@/components/Loader";
 
@@ -20,11 +19,12 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll when new message arrives
+  // Auto-scroll on new message
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // ---- SEND MESSAGE ----
   const sendMessage = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!input.trim() || !chatbotId || !companyId) {
@@ -43,40 +43,36 @@ export default function ChatPage() {
     setLoading(true);
 
     try {
-      const { data } = await apiClient.post(`/chatbot/${chatbotId}/query`, {
-        company_id: companyId,
-        query: userMessage.text,
-      });
+      // ✅ Correct fetch usage (no .post)
+      const data = await fetchClient<{ answer: string }>(
+        `/chatbot/chatbot/${chatbotId}/query`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            company_id: companyId,
+            query: userMessage.text,
+          }),
+        }
+      );
 
       const botMessage: Message = {
         id: (Date.now() + 1).toString(),
         sender: "Bot",
-        text: data.answer || "No response received.",
+        text: data.answer || "🤖 No response received.",
       };
 
       setMessages((prev) => [...prev, botMessage]);
     } catch (error: unknown) {
-      if (axios.isAxiosError(error)) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: Date.now().toString(),
-            sender: "Bot",
-            text:
-              "⚠️ Error: " +
-              (error.response?.data?.detail || "Something went wrong."),
-          },
-        ]);
-      } else {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: Date.now().toString(),
-            sender: "Bot",
-            text: "⚠️ Unexpected error occurred.",
-          },
-        ]);
-      }
+      console.error("Chat error:", error);
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          sender: "Bot",
+          text: "⚠️ Something went wrong while chatting.",
+        },
+      ]);
     } finally {
       setLoading(false);
     }

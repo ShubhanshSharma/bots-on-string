@@ -1,23 +1,34 @@
 // lib/visitorService.ts
-import { api } from "./apiClient";
-import apiClient from "./apiClient";
+import fetchClient from "./apiClient";
 
 export interface Visitor {
-  id: number;
+  id?: number;
   anonymous_id: string;
   created_at?: string;
 }
 
+/**
+ * Fetch all visitors
+ */
 export const getVisitors = async (): Promise<Visitor[]> => {
-  const { data } = await apiClient.get("/visitor/all");
-  return data;
+  return await fetchClient<Visitor[]>("/visitor/visiotr/all", {
+    method: "GET",
+  });
 };
 
+/**
+ * Create a new visitor
+ */
 export const createVisitor = async (data: Visitor): Promise<Visitor> => {
-  const res = await api.post("/api/v1/visitor", data);
-  return res.data;
+  return await fetchClient<Visitor>("/visitor/visitor", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
 };
 
+/**
+ * Delete visitor by ID
+ */
 export const deleteVisitor = async (id: string): Promise<void> => {
-  await api.delete(`/api/v1/visitor/${id}`);
+  await fetchClient<void>(`/visitor/${id}`, { method: "DELETE" });
 };

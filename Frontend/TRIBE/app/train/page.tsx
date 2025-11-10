@@ -1,8 +1,8 @@
+// Frontend/TRIBE/app/train/page.tsx
 "use client";
 
 import { useState } from "react";
-import apiClient from "@/lib/apiClient";
-import axios from "axios";
+import apiClient from "@/lib/apiClient"; // fetchClient
 import Loader from "@/components/Loader";
 
 export default function TrainChatbotPage() {
@@ -13,6 +13,7 @@ export default function TrainChatbotPage() {
   const [loading, setLoading] = useState(false);
   const [progressMessage, setProgressMessage] = useState("");
 
+  // ---- Train with FILES ----
   const handleFileUpload = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!files || !companyId || !chatbotId) {
@@ -29,23 +30,20 @@ export default function TrainChatbotPage() {
     setProgressMessage("Uploading and training your chatbot...");
 
     try {
-      await apiClient.post("/chatbot/train-files", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
+      await apiClient(`/chatbot/chatbot/train-files`, {
+        method: "POST",
+        body: formData,
       });
       setProgressMessage("✅ Training complete!");
     } catch (error: unknown) {
-      if (axios.isAxiosError(error)) {
-        setProgressMessage(
-          error.response?.data?.detail || "Training failed ❌"
-        );
-      } else {
-        setProgressMessage("Unexpected error occurred ❌");
-      }
+      console.error("Training error:", error);
+      setProgressMessage("❌ Training failed");
     } finally {
       setLoading(false);
     }
   };
 
+  // ---- Train with URL ----
   const handleUrlTrain = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!url || !companyId || !chatbotId) {
@@ -62,16 +60,14 @@ export default function TrainChatbotPage() {
     setProgressMessage("Crawling website and training chatbot...");
 
     try {
-      await apiClient.post("/chatbot/train-url", formData);
+      await apiClient(`/chatbot/chatbot/train-url`, {
+        method: "POST",
+        body: formData,
+      });
       setProgressMessage("✅ Website training complete!");
     } catch (error: unknown) {
-      if (axios.isAxiosError(error)) {
-        setProgressMessage(
-          error.response?.data?.detail || "URL training failed ❌"
-        );
-      } else {
-        setProgressMessage("Unexpected error occurred ❌");
-      }
+      console.error("URL training error:", error);
+      setProgressMessage("❌ URL training failed");
     } finally {
       setLoading(false);
     }

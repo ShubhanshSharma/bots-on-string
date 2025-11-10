@@ -33,13 +33,17 @@ def get_db() -> Generator[Session, None, None]:
 #
 # CRUD for Chatbots
 #
-@router.post("/create", response_model=ChatbotRead, status_code=status.HTTP_201_CREATED)
+@router.post("/create")
 def create_chatbot(payload: ChatbotCreate, db: Session = Depends(get_db)):
-    company = db.get(Company, payload.company_id)
+    company = db.query(Company).filter(Company.id == payload.company_id).first()
     if not company:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Company not found")
+        raise HTTPException(status_code=404, detail="Company not found")
 
-    bot = Chatbot(name=payload.name, description=payload.description, company_id=payload.company_id)
+    bot = Chatbot(
+        name=payload.name,
+        description=payload.description,
+        company_id=payload.company_id,
+    )
     db.add(bot)
     db.commit()
     db.refresh(bot)

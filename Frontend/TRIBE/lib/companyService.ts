@@ -1,5 +1,5 @@
 // lib/companyService.ts
-import { api } from "./apiClient";
+import fetchClient from "./apiClient";
 
 export interface Company {
   id?: number;
@@ -8,24 +8,31 @@ export interface Company {
   created_at?: string;
 }
 
+// ✅ Get all companies
 export const getCompanies = async (): Promise<Company[]> => {
-  const res = await api.get("/api/v1/company");
-  return res.data;
+  return await fetchClient<Company[]>("/company");
 };
 
+// ✅ Create new company
 export const createCompany = async (data: Company): Promise<Company> => {
-  const res = await api.post("/api/v1/company", data);
-  return res.data;
+  return await fetchClient<Company>("/company/company/create", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
 };
 
+// ✅ Update company
 export const updateCompany = async (
   id: number,
   data: Partial<Company>
 ): Promise<Company> => {
-  const res = await api.put(`/api/v1/company/${id}`, data);
-  return res.data;
+  return await fetchClient<Company>(`/company/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
 };
 
+// ✅ Delete company
 export const deleteCompany = async (id: number): Promise<void> => {
-  await api.delete(`/api/v1/company/${id}`);
+  await fetchClient<void>(`/company/${id}`, { method: "DELETE" });
 };

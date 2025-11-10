@@ -1,33 +1,43 @@
 // lib/apiClient.ts
-import axios from "axios";
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
-export const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000",
-  headers: {
+/**
+ * Wrapper around fetch that automatically attaches JWT token and handles JSON response.
+ */
+export async function fetchClient<T>(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const headers = new Headers({
     "Content-Type": "application/json",
-  },
-  withCredentials: false,
-});
+    ...(options.headers || {}),
+  });
 
-// Automatically attach JWT token to requests (if available)
-api.interceptors.request.use(
-  (config) => {
-    if (typeof window !== "undefined") {
-      const token = localStorage.getItem("token");
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
+  // Attach token if available
+  if (typeof window !== "undefined") {
+    const token = localStorage.getItem("token");
+    if (token) {
+      headers.set("Authorization", `Bearer ${token}`);
     }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
+  }
 
-const apiClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1",
-  headers: {
-    "Content-Type": "application/json",
-  },
-});
+  const response = await fetch(`${BASE_URL}${endpoint}`, {
+    ...options,
+    headers,
+  });
 
-export default apiClient;
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error(
+      `Fetch error: ${response.status} ${response.statusText} - ${errorBody}`
+    );
+  }
+
+  try {
+    return (await response.json()) as T;
+  } catch {
+    return {} as T;
+  }
+}
+
+export default fetchClient;
