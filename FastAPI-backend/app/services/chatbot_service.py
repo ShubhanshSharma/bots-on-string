@@ -1,198 +1,280 @@
-#  FastAPI-backend/app/services/chatbot_service.py
+# app/services/chatbot_service.py
+import os
 import io
-import logging
-import requests
-from urllib.parse import urljoin, urlparse
-from typing import List, Union
-from fastapi import UploadFile
-from bs4 import BeautifulSoup
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-from langchain.vectorstores import Qdrant
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.chains import RetrievalQA
-from langchain.schema import Document
-from app.utils.qdrant_client import qdrant_client
-from app.core.config import get_settings
-
-# File parsing imports
+import math
+import asyncio
+from typing import List, Tuple, Optional
+import httpx
+from qdrant_client import QdrantClient
+from qdrant_client.models import VectorParams, Distance, PointStruct
+# from qdrant_client.http.models import PointStruct, VectorParams, Distance
+from app.db.session import SessionLocal
+from app.models.chatbot import Chatbot
+from app.models.company import Company
+from app.models.chat import Chat
+from sqlalchemy.orm import Session
 from PyPDF2 import PdfReader
-from docx import Document as DocxDocument
+import docx
 
-settings = get_settings()
-logger = logging.getLogger(__name__)
+# ---- CONFIG ----
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
+EMBED_MODEL = os.getenv("EMBED_MODEL", "nomic-embed-text")
+LLM_MODEL = os.getenv("OLLAMA_LLM_MODEL", "smollm2:135m")  # generation model
+QDRANT_HOST = os.getenv("QDRANT_HOST", "127.0.0.1")
+QDRANT_PORT = int(os.getenv("QDRANT_PORT", "6333"))
+COLLECTION_PREFIX = "chatbot_"  # final collection name: chatbot_{chatbot_id}
 
-# ----------------------------------------------------------------
-# 🔧 Initialize models
-# ----------------------------------------------------------------
-embedding_model = OpenAIEmbeddings(
-    model="text-embedding-3-small",
-    openai_api_key=settings.OPENAI_API_KEY,
-)
+# initialize qdrant client
+# qdrant = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
+qdrant = QdrantClient("http://localhost:6333")
 
-llm = ChatOpenAI(
-    model="gpt-4o-mini",
-    temperature=0.3,
-    openai_api_key=settings.OPENAI_API_KEY,
-)
-
-# ----------------------------------------------------------------
-# 📄 FILE TEXT EXTRACTION HELPERS
-# ----------------------------------------------------------------
-def extract_text_from_file(file: UploadFile) -> str:
-    """
-    Extracts text from uploaded files.
-    """
-    filename = file.filename.lower()
-    if filename.endswith(".pdf"):
-        pdf_reader = PdfReader(file.file)
-        return "\n".join([page.extract_text() or "" for page in pdf_reader.pages])
-
-    elif filename.endswith(".docx"):
-        doc = DocxDocument(file.file)
-        return "\n".join([para.text for para in doc.paragraphs])
-
-    elif filename.endswith(".txt"):
-        return file.file.read().decode("utf-8")
-
-    elif filename.endswith(".html") or filename.endswith(".htm"):
-        soup = BeautifulSoup(file.file.read(), "html.parser")
-        return soup.get_text(separator="\n")
-
-    else:
-        raise ValueError(f"Unsupported file type: {filename}")
-
-
-# ----------------------------------------------------------------
-# 🌐 WEB PAGE SCRAPING HELPERS
-# ----------------------------------------------------------------
-def scrape_text_from_url(url: str, depth: int = 1, max_pages: int = 5) -> List[str]:
-    """
-    Crawl a given website (recursively up to `depth`) and extract visible text content.
-    """
-    visited = set()
-    texts = []
-
-    def crawl_page(page_url, current_depth):
-        if page_url in visited or len(visited) >= max_pages or current_depth > depth:
-            return
-        visited.add(page_url)
-
+# ---- UTIL: file parsers ----
+def extract_text_from_pdf(file_bytes: bytes) -> str:
+    reader = PdfReader(io.BytesIO(file_bytes))
+    pages = []
+    for p in reader.pages:
         try:
-            response = requests.get(page_url, timeout=10)
-            if response.status_code != 200 or "text/html" not in response.headers.get("Content-Type", ""):
-                return
+            pages.append(p.extract_text() or "")
+        except Exception:
+            pages.append("")
+    return "\n".join(pages)
 
-            soup = BeautifulSoup(response.text, "html.parser")
-            for script in soup(["script", "style", "noscript"]):
-                script.extract()
-            text = soup.get_text(separator="\n", strip=True)
-            if text.strip():
-                texts.append(text)
+def extract_text_from_docx(file_bytes: bytes) -> str:
+    doc = docx.Document(io.BytesIO(file_bytes))
+    paragraphs = [p.text for p in doc.paragraphs]
+    return "\n".join(paragraphs)
 
-            # Collect internal links
-            base_domain = urlparse(url).netloc
-            for link_tag in soup.find_all("a", href=True):
-                link = urljoin(page_url, link_tag["href"])
-                if urlparse(link).netloc == base_domain:
-                    crawl_page(link, current_depth + 1)
+def extract_text_from_txt(file_bytes: bytes) -> str:
+    return file_bytes.decode(errors="ignore")
 
-        except Exception as e:
-            logger.error(f"Failed to crawl {page_url}: {e}")
+def extract_text_from_file(filename: str, file_bytes: bytes) -> str:
+    lower = filename.lower()
+    if lower.endswith(".pdf"):
+        return extract_text_from_pdf(file_bytes)
+    if lower.endswith(".docx"):
+        return extract_text_from_docx(file_bytes)
+    if lower.endswith(".txt") or lower.endswith(".md") or lower.endswith(".html"):
+        return extract_text_from_txt(file_bytes)
+    # fallback: try decode
+    return extract_text_from_txt(file_bytes)
 
-    crawl_page(url, 0)
-    logger.info(f"Scraped {len(texts)} pages from {url}")
-    return texts
+# ---- TEXT CHUNKER (simple) ----
+def chunk_text(text: str, chunk_size: int = 800, overlap: int = 100) -> List[str]:
+    words = text.split()
+    chunks = []
+    i = 0
+    while i < len(words):
+        chunk = words[i : i + chunk_size]
+        chunks.append(" ".join(chunk))
+        i += chunk_size - overlap
+    return chunks
 
-
-# ----------------------------------------------------------------
-# 🧠 TRAINING: FILES OR WEBSITE
-# ----------------------------------------------------------------
-async def train_chatbot_from_files(
-    company_id: int, chatbot_id: int, files: List[UploadFile]
-):
+# ---- OLLAMA EMBEDDING / GENERATE ----
+async def ollama_embed(texts: list[str]) -> list[list[float]]:
     """
-    Process uploaded files → extract text → embed → store in Qdrant.
+    Generate embeddings using Ollama — supports both /api/embed and /api/embeddings.
+    Automatically detects which endpoint works.
     """
-    collection_name = f"chatbot_{company_id}_{chatbot_id}"
-    all_texts = []
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        payload = {"model": EMBED_MODEL, "input": texts}
 
-    for file in files:
+        # Try new endpoint first
         try:
-            text = extract_text_from_file(file)
-            if text.strip():
-                all_texts.append(text)
+            resp = await client.post(f"{OLLAMA_URL}/api/embeddings", json=payload)
+            if resp.status_code == 404:
+                # fallback to older endpoint
+                resp = await client.post(f"{OLLAMA_URL}/api/embed", json=payload)
+            resp.raise_for_status()
+            data = resp.json()
         except Exception as e:
-            logger.error(f"Error extracting {file.filename}: {e}")
+            raise RuntimeError(f"Failed to get embeddings from Ollama: {str(e)}")
 
-    if not all_texts:
-        return {"error": "No valid text found in uploaded files"}
+        # Normalize result (different models return slightly different structures)
+        if "embedding" in data:
+            return [data["embedding"]]
+        elif "embeddings" in data:
+            return data["embeddings"]
+        elif "data" in data:
+            return [d["embedding"] for d in data["data"]]
+        else:
+            raise ValueError(f"Unexpected Ollama embedding response: {data}")
 
-    return await _store_texts_in_qdrant(collection_name, all_texts)
+async def ollama_generate(prompt: str, max_tokens: int = 512, stream: bool = False) -> str:
+    """
+    Call Ollama generate endpoint with the prompt, return text output.
+    """
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        payload = {
+            "model": LLM_MODEL,
+            "prompt": prompt,
+            "max_tokens": max_tokens,
+            "stream": stream,
+        }
+        url = f"{OLLAMA_URL}/api/generate"
+        resp = await client.post(url, json=payload)
+        resp.raise_for_status()
+        body = resp.json()
+        # Ollama output forms vary: check common keys:
+        # Example: { "result": "..."} or {"text": "..."} or {"output": [{"generated_text": "..."}]}
+        if isinstance(body, dict):
+            if "text" in body:
+                return body["text"]
+            if "result" in body:
+                # sometimes result is single text element
+                r = body["result"]
+                if isinstance(r, str):
+                    return r
+            if "output" in body and isinstance(body["output"], list):
+                # try to find generated output
+                first = body["output"][0]
+                for k in ("generated_text", "text", "content"):
+                    if k in first:
+                        return first[k]
+        # fallback: stringify
+        return str(body)
 
+# ---- QDRANT helpers ----
+def ensure_collection(chatbot_id: int, vector_size: int = 768):
+    collection_name = f"chatbot_{chatbot_id}"
+
+    try:
+        qdrant.get_collection(collection_name)
+        return
+    except Exception:
+        print(f"⚙️ Creating new Qdrant collection: {collection_name}")
+
+        qdrant.recreate_collection(
+            collection_name=collection_name,
+            vectors_config=VectorParams(
+                size=vector_size,
+                distance=Distance.COSINE
+            )
+        )
+
+
+
+
+async def upsert_chunks_to_qdrant(chatbot_id: int, chunks: List[Tuple[str, dict]], vectors: List[List[float]]):
+    """
+    chunks: list of tuples (chunk_text, meta_dict)
+    vectors: list of vectors aligned to chunks
+    """
+    collection_name = f"{COLLECTION_PREFIX}{chatbot_id}"
+    vector_size = len(vectors[0]) if vectors else 0
+    ensure_collection(chatbot_id, vector_size)
+
+    points: List[PointStruct] = []
+    for i, (chunk_text, meta) in enumerate(chunks):
+        # create a stable id or leave None for qdrant to generate
+        point_id = f"{chatbot_id}_{i}_{hash(chunk_text) & 0xFFFFFFFF}"
+        points.append(PointStruct(id=point_id, vector=vectors[i], payload={"text": chunk_text, **meta}))
+    qdrant.upsert(collection_name=collection_name, points=points)
+
+# ---- HIGH LEVEL TRAIN (files) ----
+async def train_chatbot_from_files(company_id: int, chatbot_id: int, files: List[Tuple[str, bytes]]):
+    """
+    files: list of tuples (filename, file_bytes)
+    """
+    # parse & chunk all files
+    all_chunks: List[Tuple[str, dict]] = []
+    for filename, file_bytes in files:
+        text = extract_text_from_file(filename, file_bytes)
+        if not text.strip():
+            continue
+        chunks = chunk_text(text, chunk_size=400, overlap=50)
+        for idx, c in enumerate(chunks):
+            meta = {"source": filename, "chunk_index": idx}
+            all_chunks.append((c, meta))
+
+    if not all_chunks:
+        return {"message": "No text extracted from files."}
+
+    # call embeddings in batches (async)
+    texts = [c for c, _ in all_chunks]
+    BATCH = 16
+    vectors = []
+    for i in range(0, len(texts), BATCH):
+        batch_texts = texts[i : i + BATCH]
+        emb = await ollama_embed(batch_texts)
+        vectors.extend(emb)
+
+    # upsert to qdrant
+    await upsert_chunks_to_qdrant(chatbot_id, all_chunks, vectors)
+    return {"message": f"Indexed {len(all_chunks)} chunks into Qdrant for chatbot {chatbot_id}"}
+
+# ---- TRAIN FROM URL (simple crawler) ----
+import httpx
+from bs4 import BeautifulSoup
 
 async def train_chatbot_from_url(company_id: int, chatbot_id: int, url: str):
+    # simple fetch + parse text
+    async with httpx.AsyncClient(timeout=30) as client:
+        r = await client.get(url)
+        r.raise_for_status()
+        html = r.text
+    soup = BeautifulSoup(html, "html.parser")
+    # remove scripts/styles
+    for s in soup(["script", "style", "noscript"]):
+        s.decompose()
+    text = soup.get_text(separator="\n")
+    chunks = chunk_text(text, chunk_size=400, overlap=50)
+    chunk_pairs = [(c, {"source": url, "chunk_index": i}) for i, c in enumerate(chunks)]
+
+    # embed & upsert
+    BATCH = 16
+    vectors = []
+    for i in range(0, len(chunks), BATCH):
+        emb = await ollama_embed(chunks[i : i + BATCH])
+        vectors.extend(emb)
+
+    await upsert_chunks_to_qdrant(chatbot_id, chunk_pairs, vectors)
+    return {"message": f"Crawled {len(chunks)} chunks from {url} and indexed into Qdrant."}
+
+# ---- QUERY: RAG (search + generate) ----
+def qdrant_search(chatbot_id: int, query_vector: List[float], top_k: int = 5):
+    collection_name = f"{COLLECTION_PREFIX}{chatbot_id}"
+    hits = qdrant.search(collection_name=collection_name, query_vector=query_vector, limit=top_k)
+    return hits
+
+async def query_chatbot(company_id: int, chatbot_id: int, question: str) -> dict:
     """
-    Crawl website and train chatbot from extracted text.
+    Main query endpoint: embed question, retrieve from qdrant, call LLM with context.
     """
-    collection_name = f"chatbot_{company_id}_{chatbot_id}"
-    texts = scrape_text_from_url(url, depth=1, max_pages=5)
-    if not texts:
-        return {"error": "No readable text found at the given URL."}
+    # 1) embed question
+    q_embs = await ollama_embed([question])
+    q_vec = q_embs[0]
 
-    return await _store_texts_in_qdrant(collection_name, texts)
-
-
-# ----------------------------------------------------------------
-# 💾 COMMON FUNCTION: EMBEDDINGS + STORE IN QDRANT
-# ----------------------------------------------------------------
-async def _store_texts_in_qdrant(collection_name: str, texts: List[str]):
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
-    docs = [
-        Document(page_content=chunk)
-        for text in texts
-        for chunk in text_splitter.split_text(text)
-    ]
-
-    vector_store = Qdrant.from_documents(
-        docs,
-        embedding=embedding_model,
-        url=settings.QDRANT_URL,
-        api_key=settings.QDRANT_API_KEY,
-        collection_name=collection_name,
-    )
-
-    logger.info(f"✅ Data embedded and stored in Qdrant collection: {collection_name}")
-    return {"message": f"Chatbot trained successfully! {len(docs)} chunks stored."}
-
-
-# ----------------------------------------------------------------
-# 💬 CHAT: QUERY
-# ----------------------------------------------------------------
-async def query_chatbot(company_id: int, chatbot_id: int, query: str):
-    """
-    Query chatbot and return context-aware response.
-    """
-    collection_name = f"chatbot_{company_id}_{chatbot_id}"
+    # 2) search Qdrant
     try:
-        vector_store = Qdrant(
-            client=qdrant_client,
-            collection_name=collection_name,
-            embeddings=embedding_model,
-        )
+        hits = qdrant_search(chatbot_id, q_vec, top_k=5)
     except Exception as e:
-        logger.error(f"Collection not found: {collection_name} | {e}")
-        return {"error": "Chatbot not trained yet."}
+        return {"error": f"Qdrant search error: {str(e)}"}
 
-    retriever = vector_store.as_retriever(search_kwargs={"k": 3})
-    qa_chain = RetrievalQA.from_chain_type(
-        llm=llm,
-        chain_type="stuff",
-        retriever=retriever,
-        return_source_documents=True,
+    # 3) build context
+    context_pieces = []
+    for h in hits:
+        # payload contains 'text'
+        payload = h.payload or {}
+        text = payload.get("text") or ""
+        src = payload.get("source")
+        context_pieces.append(f"Source: {src}\n{text}")
+
+    context = "\n\n---\n\n".join(context_pieces)
+    prompt = (
+        "You are a helpful assistant. Use the following context from the company's documents to answer the question.\n\n"
+        f"CONTEXT:\n{context}\n\nQUESTION: {question}\n\nProvide a concise helpful answer and mention sources if present."
     )
 
-    result = qa_chain.invoke({"query": query})
-    answer = result["result"]
-    sources = [doc.page_content[:150] for doc in result["source_documents"]]
+    # 4) generate answer from Ollama
+    answer = await ollama_generate(prompt, max_tokens=512)
+    return {"answer": answer, "sources": [h.payload.get("source") for h in hits]}
 
-    return {"answer": answer, "sources": sources}
+# ---- convenience wrappers if your FastAPI endpoints call sync functions ----
+def sync_train_files_wrapper(company_id: int, chatbot_id: int, files: List[Tuple[str, bytes]]):
+    return asyncio.run(train_chatbot_from_files(company_id, chatbot_id, files))
+
+def sync_train_url_wrapper(company_id: int, chatbot_id: int, url: str):
+    return asyncio.run(train_chatbot_from_url(company_id, chatbot_id, url))
+
+def sync_query_wrapper(company_id: int, chatbot_id: int, question: str):
+    return asyncio.run(query_chatbot(company_id, chatbot_id, question))

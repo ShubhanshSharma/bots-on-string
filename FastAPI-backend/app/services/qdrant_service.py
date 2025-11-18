@@ -1,26 +1,33 @@
+# app/services/qdrant_service.py
 from qdrant_client import QdrantClient
-from qdrant_client.models import PointStruct, VectorParams, Distance
-from app.core.config import get_settings
-from qdrant_client import QdrantClient
+from qdrant_client.models import VectorParams, Distance
 from sentence_transformers import SentenceTransformer
+from app.core.config import get_settings
 
 settings = get_settings()
+QDRANT_URL = settings.QDRANT_URL  # e.g. "http://localhost:6333"
 
-# Initialize Qdrant client
-# qdrant = QdrantClient(url=settings.QDRANT_URL)
-qdrant = QdrantClient("http://localhost:6333")
-model = SentenceTransformer("all-MiniLM-L6-v2")
+# single client used everywhere
+qdrant = QdrantClient(url=QDRANT_URL)
+
+# model you'll use for embeddings (you already used all-MiniLM-L6-v2)
+EMBED_MODEL = SentenceTransformer("all-MiniLM-L6-v2")
+VECTOR_SIZE = EMBED_MODEL.get_sentence_embedding_dimension()
+
+# collection name (you may change per company/chatbot later)
 COLLECTION_NAME = "company_documents"
 
-def init_collection():
-    """
-    Initialize Qdrant collection if it doesn't exist.
-    """
-    if COLLECTION_NAME not in [c.name for c in qdrant.get_collections().collections]:
-        qdrant.recreate_collection(
-            collection_name=COLLECTION_NAME,
-            vectors_config=VectorParams(size=1536, distance=Distance.COSINE),
-        )
+def init_qdrant_collection(collection_name: str = COLLECTION_NAME):
+    """Create collection with correct vector size if it doesn't exist."""
+    existing = [c.name for c in qdrant.get_collections().collections]
+    if collection_name in existing:
+        return False  # existed already
+    qdrant.create_collection(
+        collection_name=collection_name,
+        vectors_config=VectorParams(size=VECTOR_SIZE, distance=Distance.COSINE),
+    )
+    return True
+
 
 def store_vector(company_id: str, vector: list[float], text: str):
     """
@@ -69,3 +76,38 @@ def get_qdrant_client():
     # read host/port from settings in app.core.config
     from app.core.config import settings
     return QdrantClient(url=settings.QDRANT_URL)
+
+
+
+
+
+# shubhansh code:
+from qdrant_client.models import Filter, FieldCondition, MatchValue
+from app.services.qdrant_service import qdrant, EMBED_MODEL, COLLECTION_NAME
+
+def retrieve_chunks(query: str, chatbot_id: int, top_k: int = 3):
+    """Search Qdrant for relevant context chunks."""
+    query_vec = EMBED_MODEL.encode([query])[0].tolist()
+
+    # Filter: only return chunks belonging to this chatbot
+    query_filter = Filter(
+        must=[
+            FieldCondition(
+                key="chatId",
+                match=MatchValue(value=str(chatbot_id))
+            )
+        ]
+    )
+
+    # Perform similarity search
+    results = qdrant.search(
+        collection_name=COLLECTION_NAME,
+        query_vector=query_vec,
+        limit=top_k,
+        query_filter=query_filter
+    )
+
+    # Extract chunk texts
+    chunks = [result.payload["text"] for result in results]
+
+    return chunks

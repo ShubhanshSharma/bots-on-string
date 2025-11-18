@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
+import "./Navbar.css";
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -16,49 +17,44 @@ export default function Navbar() {
   ];
 
   return (
-    <nav className="bg-blue-600 text-white shadow-md">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
-          {/* Brand */}
-          <Link href="/" className="text-2xl font-bold tracking-tight">
-            T.R.I.B.E 🤖
-          </Link>
+    <nav className="nav-container">
+      <div className="nav-inner">
+        {/* Brand */}
+        <Link href="/" className="nav-brand">
+          T.R.I.B.E 🤖
+        </Link>
 
-          {/* Desktop Nav */}
-          <div className="hidden md:flex gap-6">
-            {navLinks.map((link) => (
-              <Link
-                key={link.path}
-                href={link.path}
-                className={`hover:text-yellow-300 transition ${
-                  pathname === link.path ? "text-yellow-300 font-semibold" : ""
-                }`}
-              >
-                {link.name}
-              </Link>
-            ))}
-          </div>
-
-          {/* Mobile Menu Toggle */}
-          <button
-            className="md:hidden p-2 rounded hover:bg-blue-700"
-            onClick={() => setOpen(!open)}
-          >
-            {open ? <X size={24} /> : <Menu size={24} />}
-          </button>
+        {/* Desktop Menu */}
+        <div className="nav-links-desktop">
+          {navLinks.map((link) => (
+            <Link
+              key={link.path}
+              href={link.path}
+              className={`nav-link ${
+                pathname === link.path ? "active-link" : ""
+              }`}
+            >
+              {link.name}
+            </Link>
+          ))}
         </div>
+
+        {/* Mobile Toggle */}
+        <button className="nav-toggle" onClick={() => setOpen(!open)}>
+          {open ? <X size={24} /> : <Menu size={24} />}
+        </button>
       </div>
 
       {/* Mobile Dropdown */}
       {open && (
-        <div className="md:hidden bg-blue-700">
+        <div className="nav-mobile-menu">
           {navLinks.map((link) => (
             <Link
               key={link.path}
               href={link.path}
               onClick={() => setOpen(false)}
-              className={`block px-4 py-3 border-t border-blue-500 hover:bg-blue-800 ${
-                pathname === link.path ? "text-yellow-300 font-semibold" : ""
+              className={`nav-mobile-link ${
+                pathname === link.path ? "active-link" : ""
               }`}
             >
               {link.name}

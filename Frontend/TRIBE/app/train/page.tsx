@@ -1,177 +1,128 @@
-// Frontend/TRIBE/app/train/page.tsx
 "use client";
 
-import { useState } from "react";
-import apiClient from "@/lib/apiClient"; // fetchClient
+import { useEffect, useState } from "react";
 import Loader from "@/components/Loader";
+import "./style.css";
+import { useRouter } from "next/navigation";
 
 export default function TrainChatbotPage() {
+  const router = useRouter();
+
   const [companyId, setCompanyId] = useState("");
-  const [chatbotId, setChatbotId] = useState("");
-  const [files, setFiles] = useState<FileList | null>(null);
-  const [url, setUrl] = useState("");
+  const [chatName, setChatName] = useState("");
+  const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [progressMessage, setProgressMessage] = useState("");
 
-  // ---- Train with FILES ----
-  const handleFileUpload = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!files || !companyId || !chatbotId) {
-      alert("Please fill all required fields and select files.");
-      return;
-    }
+  const MAX_PDF_SIZE_MB = 5;
+  const MAX_PDF_SIZE_BYTES = MAX_PDF_SIZE_MB * 1024 * 1024;
 
-    const formData = new FormData();
-    formData.append("company_id", companyId);
-    formData.append("chatbot_id", chatbotId);
-    Array.from(files).forEach((file) => formData.append("files", file));
+  useEffect(() => {
+    const stored = localStorage.getItem("companyID");
+    setCompanyId(stored || "");
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!chatName) return alert(" Chat name required.");
+    if (!file) return alert("Please upload a PDF file.");
 
     setLoading(true);
-    setProgressMessage("Uploading and training your chatbot...");
+    setProgressMessage("Uploading PDF...");
 
     try {
-      await apiClient(`/chatbot/chatbot/train-files`, {
+      const BASE_URL =
+        process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("companyId", companyId);
+      formData.append("chatName", chatName);
+
+      const res = await fetch(`${BASE_URL}/upload/upload`, {
         method: "POST",
         body: formData,
       });
-      setProgressMessage("✅ Training complete!");
-    } catch (error: unknown) {
-      console.error("Training error:", error);
-      setProgressMessage("❌ Training failed");
+
+      if (!res.ok) throw new Error("Upload failed");
+
+      const data = await res.json();
+      setProgressMessage("✅ PDF uploaded and text extracted!");
+
+      // 🚀 Redirect to /chat/{chatbot_id}
+      if (data.chatbot_id) {
+        router.push(`/chat/${data.chatbot_id}`);
+      }
+    } catch (error) {
+      console.error(error);
+      setProgressMessage("❌ Failed to upload.");
     } finally {
       setLoading(false);
     }
   };
 
-  // ---- Train with URL ----
-  const handleUrlTrain = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!url || !companyId || !chatbotId) {
-      alert("Please fill all required fields and enter a URL.");
-      return;
-    }
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const uploaded = e.target.files?.[0];
+    if (!uploaded) return;
 
-    const formData = new FormData();
-    formData.append("company_id", companyId);
-    formData.append("chatbot_id", chatbotId);
-    formData.append("url", url);
+    if (uploaded.type !== "application/pdf")
+      return alert("Only PDF files allowed.");
 
-    setLoading(true);
-    setProgressMessage("Crawling website and training chatbot...");
+    if (uploaded.size > MAX_PDF_SIZE_BYTES)
+      return alert(`PDF cannot exceed ${MAX_PDF_SIZE_MB} MB.`);
 
-    try {
-      await apiClient(`/chatbot/chatbot/train-url`, {
-        method: "POST",
-        body: formData,
-      });
-      setProgressMessage("✅ Website training complete!");
-    } catch (error: unknown) {
-      console.error("URL training error:", error);
-      setProgressMessage("❌ URL training failed");
-    } finally {
-      setLoading(false);
-    }
+    setFile(uploaded);
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6 flex flex-col items-center relative">
+    <div className="train-page-container">
       {loading && <Loader message={progressMessage} />}
 
-      <h1 className="text-3xl font-bold mb-4">Train Your Chatbot 🤖</h1>
+      <div className="train-card">
+        <h1 className="train-title">📄 Train Chatbot with PDF</h1>
 
-      <div className="bg-white shadow-md rounded-xl p-6 w-full max-w-lg space-y-6">
-        <div className="flex gap-4">
-          <div className="w-full">
-            <label
-              htmlFor="companyId"
-              className="block text-sm font-medium mb-1"
-            >
-              Company ID
-            </label>
+        <form onSubmit={handleSubmit} className="train-form">
+          {/* <div>
+            <label>Company ID</label>
             <input
-              id="companyId"
-              name="companyId"
-              type="number"
-              placeholder="Enter Company ID"
-              title="Enter Company ID"
+              placeholder="Enter your company ID"
               value={companyId}
               onChange={(e) => setCompanyId(e.target.value)}
-              className="border rounded-md p-2 w-full"
             />
-          </div>
+          </div> */}
 
-          <div className="w-full">
-            <label
-              htmlFor="chatbotId"
-              className="block text-sm font-medium mb-1"
-            >
-              Chatbot ID
-            </label>
+          <div>
+            <label>Chat Name</label>
             <input
-              id="chatbotId"
-              name="chatbotId"
-              type="number"
-              placeholder="Enter Chatbot ID"
-              title="Enter Chatbot ID"
-              value={chatbotId}
-              onChange={(e) => setChatbotId(e.target.value)}
-              className="border rounded-md p-2 w-full"
+              placeholder="Enter your chat Name"
+              value={chatName}
+              onChange={(e) => setChatName(e.target.value)}
             />
           </div>
-        </div>
 
-        {/* --- FILE TRAINING FORM --- */}
-        <form onSubmit={handleFileUpload} className="space-y-3">
-          <label htmlFor="fileInput" className="block text-sm font-semibold">
-            Train using files
-          </label>
-          <input
-            id="fileInput"
-            type="file"
-            multiple
-            accept=".pdf,.docx,.txt,.html"
-            title="Upload training files"
-            onChange={(e) => setFiles(e.target.files)}
-            className="block border rounded-md p-2 w-full"
-          />
-          <button
-            type="submit"
-            disabled={loading}
-            className="bg-blue-600 text-white rounded-md py-2 px-4 hover:bg-blue-700"
-          >
-            {loading ? "Training..." : "Upload & Train"}
-          </button>
-        </form>
+          <div>
+            <label htmlFor="file">Upload PDF (max {MAX_PDF_SIZE_MB}MB)</label>
+            <input
+              id="file"
+              type="file"
+              accept="application/pdf"
+              onChange={handleFileSelect}
+            />
 
-        <div className="border-t my-4"></div>
+            {file && (
+              <p className="selected-file">
+                Selected: <strong>{file.name}</strong>
+              </p>
+            )}
+          </div>
 
-        {/* --- URL TRAINING FORM --- */}
-        <form onSubmit={handleUrlTrain} className="space-y-3">
-          <label htmlFor="websiteUrl" className="block text-sm font-semibold">
-            Train from website URL
-          </label>
-          <input
-            id="websiteUrl"
-            type="url"
-            placeholder="https://example.com"
-            title="Enter website URL for training"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            className="border rounded-md p-2 w-full"
-          />
-          <button
-            type="submit"
-            disabled={loading}
-            className="bg-green-600 text-white rounded-md py-2 px-4 hover:bg-green-700"
-          >
-            {loading ? "Training..." : "Crawl & Train"}
+          <button type="submit" disabled={loading} className="train-submit">
+            {loading ? "Uploading..." : "Upload PDF"}
           </button>
         </form>
 
         {!loading && progressMessage && (
-          <p className="mt-4 text-center text-gray-700 font-medium animate-pulse">
-            {progressMessage}
-          </p>
+          <p className="train-message">{progressMessage}</p>
         )}
       </div>
     </div>

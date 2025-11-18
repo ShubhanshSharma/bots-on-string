@@ -1,0 +1,72 @@
+.form-container {
+  width: 400px;
+  margin: 50px auto;
+  padding: 25px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  text-align: center;
+}
+
+input, textarea {
+  width: 90%;
+  padding: 10px;
+  margin: 10px 0;
+  font-size: 15px;
+}
+
+textarea {
+  height: 80px;
+  resize: none;
+}
+
+button {
+  width: 95%;
+  padding: 12px;
+  cursor: pointer;
+  border: none;
+  background: black;
+  color: white;
+  margin-top: 10px;
+  font-size: 16px;
+}
+
+.msg {
+  margin-top: 15px;
+  color: #333;
+  font-size: 15px;
+  word-break: break-word;
+}
+
+
+.password-container {
+  position: relative;
+  width: 90%;
+  transform: translateX(-9px);
+  margin: 0px auto;
+}
+
+.password-container input {
+  width: 100%;
+  /* padding-right: 70px; */
+}
+
+.toggle-visibility {
+  position: absolute;
+  right: 10px;
+  top: 12px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #333;
+}
+
+.match {
+  color: green;
+  font-size: 14px;
+  margin-top: -5px;
+}
+
+.no-match {
+  color: red;
+  font-size: 14px;
+  margin-top: -5px;
+}

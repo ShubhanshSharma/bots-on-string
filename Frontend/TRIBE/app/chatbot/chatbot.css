@@ -1,0 +1,73 @@
+.page-container {
+  min-height: 100vh;
+  background-color: #f8f9fa;
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.page-title {
+  font-size: 32px;
+  font-weight: bold;
+  margin-bottom: 32px;
+}
+
+.card {
+  background: white;
+  width: 600px;
+  max-width: 90%;
+  padding: 32px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+.section-title {
+  font-size: 20px;
+  font-weight: bold;
+  margin-bottom: 16px;
+}
+
+.loading-text,
+.empty-text {
+  color: #666;
+  margin-bottom: 20px;
+}
+
+.chatbot-list {
+  list-style: none;
+  padding: 0;
+  margin-bottom: 24px;
+}
+
+.chatbot-item {
+  background: #f1f3f5;
+  padding: 14px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  text-align: left;
+}
+
+.chatbot-description {
+  font-size: 14px;
+  color: #555;
+  margin-top: 4px;
+}
+
+.train-button {
+  width: 100%;
+  padding: 14px;
+  font-size: 16px;
+  font-weight: 500;
+  background-color: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.train-button:hover {
+  background-color: #1d4ed8;
+}

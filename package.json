@@ -1,5 +1,9 @@
 {
   "devDependencies": {
-    "@tailwindcss/postcss": "^4.1.16"
+    "@tailwindcss/postcss": "^4.1.16",
+    "@types/pdfjs-dist": "^2.10.377"
+  },
+  "dependencies": {
+    "pdfjs-dist": "^5.4.394"
   }
 }

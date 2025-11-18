@@ -1,4 +1,5 @@
 from qdrant_client import QdrantClient
+from qdrant_client.models import VectorParams, Distance
 import os
 from app.core.config import get_settings
 from dotenv import load_dotenv
@@ -23,7 +24,7 @@ def get_qdrant() -> QdrantClient:
     try:
         client = QdrantClient(
             url=QDRANT_URL,
-            api_key=QDRANT_API_KEY
+            # api_key=QDRANT_API_KEY
         )
         return client
     except Exception as e:

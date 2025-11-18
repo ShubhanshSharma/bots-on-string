@@ -1,92 +1,80 @@
 "use client";
 
-import { useState } from "react";
-import { createChatbot } from "@/lib/chatBotService";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import "./chatbot.css";
+
+type Chatbot = {
+  id: number;
+  name: string;
+  description: string;
+  company_id: number;
+};
 
 export default function CreateChatbotPage() {
-  const [companyId, setCompanyId] = useState("");
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
+  const router = useRouter();
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!companyId || !name) {
-      alert("Please fill in Company ID and Chatbot Name");
-      return;
-    }
+  const [chatbots, setChatbots] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-    setLoading(true);
-    setMessage("");
-
-    try {
-      const chatbot = await createChatbot({
-        company_id: parseInt(companyId),
-        name,
-        description,
-      });
-      setMessage(`✅ Chatbot created successfully! ID: ${chatbot.id}`);
-    } catch (error) {
-      console.error(error);
-      setMessage("❌ Failed to create chatbot");
-    } finally {
-      setLoading(false);
-    }
+  const goToTrain = () => {
+    router.push("/train");
   };
 
+  useEffect(() => {
+    const fetchChatbots = async () => {
+      try {
+        const companyId = localStorage.getItem("company_id");
+        if (!companyId) {
+          setLoading(false);
+          return;
+        }
+
+        const res = await fetch("http://localhost:8000/chatbot/chatbot");
+        const data = await res.json();
+
+        // Filter the chatbots by company_id
+        const filtered = data.filter(
+          (cb: any) => cb.company_id === parseInt(companyId)
+        );
+
+        setChatbots(filtered);
+      } catch (error) {
+        console.error("Failed to load chatbots:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchChatbots();
+  }, []);
+
   return (
-    <div className="min-h-screen bg-gray-50 p-6 flex flex-col items-center">
-      <h1 className="text-3xl font-bold mb-6">Create a Chatbot 🤖</h1>
+    <div className="page-container">
+      <h1 className="page-title">Chatbot Setup 🤖</h1>
 
-      <form
-        onSubmit={handleSubmit}
-        className="bg-white p-6 rounded-xl shadow-md w-full max-w-md space-y-4"
-      >
-        <div>
-          <label className="block text-sm font-medium mb-1">Company ID</label>
-          <input
-            type="number"
-            placeholder="Enter Company ID"
-            value={companyId}
-            onChange={(e) => setCompanyId(e.target.value)}
-            className="border rounded-md p-2 w-full"
-          />
-        </div>
+      <div className="card">
+        <h2 className="section-title">Your Chatbots</h2>
 
-        <div>
-          <label className="block text-sm font-medium mb-1">Chatbot Name</label>
-          <input
-            type="text"
-            placeholder="Enter chatbot name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="border rounded-md p-2 w-full"
-          />
-        </div>
+        {loading ? (
+          <p className="loading-text">Loading chatbots...</p>
+        ) : chatbots.length === 0 ? (
+          <p className="empty-text">No chatbots found for your company.</p>
+        ) : (
+          <ul className="chatbot-list">
+            {chatbots.map((bot: any) => (
+              <li key={bot.id} className="chatbot-item">
+                <strong>{bot.name}</strong>
+                <p className="chatbot-description">{bot.description}</p>
+              </li>
+            ))}
+          </ul>
+        )}
 
-        <div>
-          <label className="block text-sm font-medium mb-1">Description</label>
-          <textarea
-            placeholder="Enter chatbot description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            className="border rounded-md p-2 w-full"
-          />
-        </div>
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="bg-blue-600 text-white w-full py-2 rounded-md hover:bg-blue-700"
-        >
-          {loading ? "Creating..." : "Create Chatbot"}
+        <button className="train-button" onClick={goToTrain}>
+          Go to Training Page
         </button>
-      </form>
-
-      {message && (
-        <p className="mt-4 text-center text-gray-700 font-medium">{message}</p>
-      )}
+      </div>
     </div>
   );
 }

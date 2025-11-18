@@ -1,11 +1,7 @@
-import "./globals.css";
+import "./style.css";
 import Navbar from "@/components/Navbar";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
-import VisitorsPage from "./visitors/page";
-import ChatPage from "./chat/page";
-import CompanyPage from "./company/page";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -28,10 +24,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className="min-h-screen bg-gray-50 text-gray-900">
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
+      <body className="layout-body">
         <Navbar />
-        <main className="p-6">{children}</main>
+        <main className="layout-main">{children}</main>
       </body>
     </html>
   );

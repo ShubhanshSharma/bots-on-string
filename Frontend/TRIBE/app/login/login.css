@@ -1,0 +1,28 @@
+.form-container {
+  width: 350px;
+  margin: 50px auto;
+  padding: 25px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  text-align: center;
+}
+
+input {
+  width: 90%;
+  padding: 10px;
+  margin: 10px 0;
+}
+
+button {
+  width: 95%;
+  padding: 12px;
+  cursor: pointer;
+  border: none;
+  background: #1e1e1e;
+  color: white;
+}
+
+.msg {
+  margin-top: 15px;
+  word-break: break-all;
+}

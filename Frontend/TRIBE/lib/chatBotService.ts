@@ -93,8 +93,15 @@ export async function queryChatbot(
   chatbotId: number,
   query: string
 ): Promise<QueryResponse> {
-  return await fetchClient<QueryResponse>(`/chatbot/${chatbotId}/query`, {
-    method: "POST",
-    body: JSON.stringify({ company_id: companyId, query }),
-  });
+  return await fetchClient<QueryResponse>(
+    `/chatbot/chatbot/${chatbotId}/query`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        company_id: companyId,
+        chatbotId: chatbotId,
+        query,
+      }),
+    }
+  );
 }

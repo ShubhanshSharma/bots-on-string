@@ -1,0 +1,95 @@
+/* PAGE CONTAINER */
+.train-page-container {
+  /* min-height: 100vh; */
+  /* background: #f1f5f9; */
+  display: flex;
+  justify-content: center;
+  padding: 40px 20px;
+}
+
+/* CARD */
+.train-card {
+  background: white;
+  padding: 32px;
+  width: 100%;
+  max-width: 480px;
+  border-radius: 16px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+}
+
+/* TITLE */
+.train-title {
+  text-align: center;
+  font-size: 28px;
+  font-weight: 800;
+  margin-bottom: 24px;
+}
+
+/* FORM SPACING */
+.train-form > div {
+  margin-bottom: 22px;
+}
+
+/* LABEL */
+.train-form label {
+  display: block;
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 6px;
+  color: #374151;
+}
+
+/* INPUT */
+.train-form input[type="text"],
+.train-form input[type="file"] {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  font-size: 15px;
+  transition: border 0.2s, box-shadow 0.2s;
+}
+
+.train-form input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25);
+  outline: none;
+}
+
+/* SELECTED FILE */
+.selected-file {
+  margin-top: 6px;
+  font-size: 14px;
+  color: #4b5563;
+}
+
+/* SUBMIT BUTTON */
+.train-submit {
+  width: 100%;
+  padding: 14px;
+  background: #2563eb;
+  color: white;
+  font-weight: 600;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  transition: background 0.25s ease;
+}
+
+.train-submit:hover {
+  background: #1e40af;
+}
+
+.train-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* STATUS MESSAGE */
+.train-message {
+  margin-top: 20px;
+  text-align: center;
+  font-size: 15px;
+  color: #374151;
+}

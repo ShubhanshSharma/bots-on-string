@@ -7,9 +7,9 @@ load_dotenv()
 
 class Settings(BaseSettings):
     DATABASE_URL: str
-    OPENAI_API_KEY: str
-    QDRANT_URL: str
-    QDRANT_API_KEY: str = ""
+    # OPENAI_API_KEY: str
+    QDRANT_URL: str = "http://localhost:6333"
+    # QDRANT_API_KEY: str = ""
     ADMIN_API_KEY: str = "admin"
     SESSION_TTL_SECONDS: int = 3600
     SERVER_HOST: str = "0.0.0.0"
